@@ -56,6 +56,7 @@ def index():
                                    playlist_url=playlist_url)
 
         songs_lists = []
+        band_names = []
         for url in urls:
             result = {
                 'playlist_url': None,
@@ -74,6 +75,7 @@ def index():
                 else:
                     songs_lists.append(setlist_data["songs"])
                     band_name = setlist_data["band_name"]
+                    band_names.append(band_name)
                     location = setlist_data["location"]
                     result["band_name"] = band_name
                     result["location"] = location
@@ -82,7 +84,7 @@ def index():
             results.append(result)
 
         try:
-            playlist_data = create_spotify_playlist(songs_lists, sp)
+            playlist_data = create_spotify_playlist(songs_lists, band_names, sp)
             if playlist_data.get("error"):
                 error = playlist_data.get("error")
             else:

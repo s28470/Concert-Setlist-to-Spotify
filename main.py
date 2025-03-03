@@ -109,21 +109,24 @@ def get_band_name_and_songs(url):
         }
 
 
-def create_spotify_playlist(songs_lists, sp):
+def create_spotify_playlist(songs_lists, band_names, sp):
     """
     Creates a single Spotify playlist with all given songs.
 
     Args:
         songs_lists: A list of lists of song titles (strings).
+        band_names: A list of band names (strings).
         sp: The authenticated Spotify client.
 
     Returns:
         A dictionary containing the playlist's URL and ID.
     """
     all_songs = []
-    for songs in songs_lists:
-        if songs:
-            all_songs.extend(songs)
+    all_bands = []
+    for index, songs in enumerate(songs_lists):
+      if songs:
+          all_songs.extend(songs)
+          all_bands.extend([band_names[index]] * len(songs))
     if not all_songs:
         raise ValueError("There is no song to create the playlist")
 
@@ -134,16 +137,19 @@ def create_spotify_playlist(songs_lists, sp):
 
         song_uris = []
         for index, song in enumerate(all_songs):
-            result = sp.search(q=f"track:{song}", type="track", limit=5)
-            found = False
-            for track in result["tracks"]["items"]:
-                    track_uri = track["uri"]
-                    song_uris.append(track_uri)
-                    found = True
-                    break
+          band_name = all_bands[index]
+          result = sp.search(q=f"track:{song} artist:{band_name}", type="track", limit=5)
+          found = False
+          for track in result["tracks"]["items"]:
+              track_artist = track["artists"][0]["name"].lower()
+              if band_name.lower() in track_artist or track_artist in band_name.lower():
+                  track_uri = track["uri"]
+                  song_uris.append(track_uri)
+                  found = True
+                  break
 
-            if not found:
-                logging.warning(f"Could not find '{song}' on Spotify.")
+          if not found:
+                logging.warning(f"Could not find '{song}' by {band_name} on Spotify.")
 
         for i in range(0, len(song_uris), 100):
             sp.playlist_add_items(playlist_id, song_uris[i:i + 100])
