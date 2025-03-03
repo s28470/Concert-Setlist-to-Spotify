@@ -84,11 +84,13 @@ def get_band_name_and_songs(url):
                     song_title = a_tag_song_label.text.strip()
                     songs.append(song_title)
 
+        location = extract_location_from_url(url)
 
         return {
             'band_name': band_name,
             'songs': songs or None,
             'error': None,
+            'location': location
         }
 
     except requests.exceptions.RequestException as e:
@@ -96,57 +98,61 @@ def get_band_name_and_songs(url):
             'band_name': None,
             'songs': None,
             'error': f"Error during request: {e}",
+            'location': None
         }
     except Exception as e:
         return {
             'band_name': None,
             'songs': None,
             'error': f"An unexpected error occurred: {e}",
+            'location': None
         }
 
 
-def create_spotify_playlist(band_name, songs, sp, location):
+def create_spotify_playlist(songs_lists, sp):
     """
-    Creates a Spotify playlist with the given songs.
+    Creates a single Spotify playlist with all given songs.
 
     Args:
-        band_name: The name of the band (string).
-        songs: A list of song titles (strings).
+        songs_lists: A list of lists of song titles (strings).
         sp: The authenticated Spotify client.
-        location: The concert location (string).
 
     Returns:
         A dictionary containing the playlist's URL and ID.
     """
-    if not songs:
+    all_songs = []
+    for songs in songs_lists:
+        if songs:
+            all_songs.extend(songs)
+    if not all_songs:
         raise ValueError("There is no song to create the playlist")
+
     try:
         user_id = sp.me()["id"]
-        playlist = sp.user_playlist_create(user_id, f"{band_name} Setlist - {location}", public=False)
+        playlist = sp.user_playlist_create(user_id, f"Multiple Setlists", public=False)
         playlist_id = playlist["id"]
 
         song_uris = []
-        for song in songs:
-            result = sp.search(q=f"track:{song} artist:{band_name}", type="track", limit=5)
+        for index, song in enumerate(all_songs):
+            result = sp.search(q=f"track:{song}", type="track", limit=5)
             found = False
             for track in result["tracks"]["items"]:
-                track_artist = track["artists"][0]["name"].lower()
-                if band_name.lower() in track_artist or track_artist in band_name.lower():
                     track_uri = track["uri"]
                     song_uris.append(track_uri)
                     found = True
                     break
 
             if not found:
-                raise ValueError(f"Could not find '{song}' by {band_name} on Spotify.")
+                logging.warning(f"Could not find '{song}' on Spotify.")
 
         for i in range(0, len(song_uris), 100):
             sp.playlist_add_items(playlist_id, song_uris[i:i + 100])
 
         return {"url": playlist["external_urls"]["spotify"], "id": playlist_id}
 
-
-    except ValueError as e:
-        raise ValueError(f"An error occurred while interacting with the Spotify API: {e}")
+    except spotipy.exceptions.SpotifyException as e:
+        logging.error(f"An error occurred while interacting with the Spotify API: {e}")
+        return {"error": f"An error occurred while interacting with the Spotify API: {e}"}
     except Exception as e:
-        raise Exception(f"An error occurred while interacting with the Spotify API: {e}")
+        logging.error(f"An error occurred while interacting with the Spotify API: {e}")
+        return {"error": f"An error occurred while interacting with the Spotify API: {e}"}
