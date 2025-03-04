@@ -4,8 +4,10 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Setlist to Spotify Playlist</title>
-  <link rel="stylesheet" href="/css/style.css" />
-  <script src="/js/script.js"></script><body>
+  
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+</head>
+<body>
   <div class="container">
     <h1>Setlist to Spotify Playlist</h1>
     <form id="setlistForm" method="POST">
@@ -60,6 +62,7 @@
       </div>
     {% endif %}
   </div>
-  <script src="script.js"></script>
+
+  <script src="{{ url_for('static', filename='js/script.js') }}"></script>
 </body>
 </html>

@@ -162,15 +162,7 @@ def delete_playlist():
             session.pop("band_names_with_locations", None)
     return redirect(url_for('index'))
 
-from flask import send_from_directory
 
-@app.route('/css/<path:filename>')
-def send_css(filename):
-    return send_from_directory('templates', filename)
-
-@app.route('/js/<path:filename>')
-def send_js(filename):
-    return send_from_directory('templates', filename)
 
 if __name__ == "__main__":
     host = "0.0.0.0"
