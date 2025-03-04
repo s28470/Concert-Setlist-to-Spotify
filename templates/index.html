@@ -1,75 +1,65 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Setlist to Spotify Playlist</title>
-    <link rel="stylesheet" href="style.css">
-    <script>
-        function addUrlField() {
-            const form = document.getElementById('setlistForm');
-            const urlFields = form.querySelectorAll('input[type="url"]');
-            const lastUrlField = urlFields[urlFields.length - 1];
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Setlist to Spotify Playlist</title>
+  <link rel="stylesheet" href="/css/style.css" />
+  <script src="/js/script.js"></script><body>
+  <div class="container">
+    <h1>Setlist to Spotify Playlist</h1>
+    <form id="setlistForm" method="POST">
+      <div id="urlFieldsContainer">
+        <div class="field-container">
+          <input type="url" id="url" name="url" required placeholder="Setlist.fm URL" class="url-field" />
+          <button type="button" class="delete-url-button" onclick="removeField(this)">X</button>
+        </div>
+      </div>
+      <button type="button" onclick="addUrlField()">Add Another URL</button>
+      <button type="submit" class="create-button">Create Playlist</button>
+    </form>
 
-            // Create a new URL input field
-            const newUrlField = document.createElement('input');
-            newUrlField.type = 'url';
-            newUrlField.name = 'url';
-            newUrlField.required = true;
-            newUrlField.placeholder = 'Setlist.fm URL';
-            newUrlField.style.display = 'block';
-            newUrlField.style.marginTop = '5px';
+    {% if error %}
+      <div class="error">Error: {{ error }}</div>
+    {% endif %}
 
-            form.insertBefore(newUrlField, lastUrlField.nextSibling);
-        }
-    </script>
-</head>
-<body>
-    <div class="container">
-        <h1>Setlist to Spotify Playlist</h1>
-        <form id="setlistForm" method="POST">
-            <label for="url">Setlist.fm URL:</label>
-            <input type="url" id="url" name="url" required placeholder="Setlist.fm URL">
-            <button type="button" onclick="addUrlField()">Add Another URL</button>
-            <button type="submit" class="create-button">Create Playlist</button>
+    {% if playlist_id %}
+      <div class="success spotify-preview">
+        <p>You can find your playlist here: <a href="{{ playlist_url }}" target="_blank">View on Spotify</a></p>
+        <form action="/delete_playlist" method="post">
+          <button type="submit" class="delete-button">Delete Playlist</button>
         </form>
+        {% if band_names_with_locations %}
+          <form method="POST" class="rename-form">
+            <button type="submit" name="rename" class="rename-button">Rename Playlist</button>
+            <select name="band_name_with_location">
+              {% for band_name_with_location in band_names_with_locations %}
+                <option value="{{ band_name_with_location }}">{{ band_name_with_location }}</option>
+              {% endfor %}
+            </select>
+          </form>
+        {% endif %}
+      </div>
+    {% endif %}
 
-        {% if error %}
-            <div class="error">Error: {{ error }}</div>
-        {% endif %}
-        
-        {% if playlist_id %}
-        <div class="success spotify-preview">
-            {% if playlist_url %}
-            <p>You can find your playlist here: <a href="{{ playlist_url }}" target="_blank">View on Spotify</a></p>
-            <iframe id="spotifyIframe" src="{{ playlist_url }}"
-                    width="100%" height="352" frameBorder="0" allowfullscreen=""
-                    allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-                    loading="lazy"></iframe>
-            {% endif %}
-            <form action="/delete_playlist" method="post">
-                <button type="submit" class="delete-button">Delete Playlist</button>
-            </form>
-        </div>
-        {% endif %}
-
-        {% if results %}
-        <div class="results">
-            <h2>Results:</h2>
-            <ul>
-                {% for result in results %}
-                    <li>
-                        {% if result.band_name and result.location %}
-                            <strong>{{ result.band_name }}</strong> - {{ result.location }}
-                        {% endif %}
-                        {% if result.error %}
-                            <div class="error">Error: {{ result.error }}</div>
-                        {% endif %}
-                    </li>
-                {% endfor %}
-            </ul>
-        </div>
-        {% endif %}
-    </div>
+    {% if results %}
+      <div class="results">
+        <h2>Results:</h2>
+        <ul>
+          {% for result in results %}
+            <li>
+              {% if result.band_name and result.location %}
+                <strong>{{ result.band_name }}</strong> - {{ result.location }}
+              {% endif %}
+              {% if result.error %}
+                <div class="error">Error: {{ result.error }}</div>
+              {% endif %}
+            </li>
+          {% endfor %}
+        </ul>
+      </div>
+    {% endif %}
+  </div>
+  <script src="script.js"></script>
 </body>
 </html>

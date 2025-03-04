@@ -109,7 +109,7 @@ def get_band_name_and_songs(url):
         }
 
 
-def create_spotify_playlist(songs_lists, band_names, sp):
+def create_spotify_playlist(songs_lists, band_names, locations, sp):
     """
     Creates a single Spotify playlist with all given songs.
 
@@ -117,22 +117,28 @@ def create_spotify_playlist(songs_lists, band_names, sp):
         songs_lists: A list of lists of song titles (strings).
         band_names: A list of band names (strings).
         sp: The authenticated Spotify client.
+        locations: A list of locations (strings).
 
     Returns:
         A dictionary containing the playlist's URL and ID.
     """
     all_songs = []
     all_bands = []
+    all_locations=[]
     for index, songs in enumerate(songs_lists):
       if songs:
           all_songs.extend(songs)
           all_bands.extend([band_names[index]] * len(songs))
+          all_locations.extend([locations[index]] * len(songs))
     if not all_songs:
         raise ValueError("There is no song to create the playlist")
 
     try:
         user_id = sp.me()["id"]
-        playlist = sp.user_playlist_create(user_id, f"Multiple Setlists", public=False)
+        playlist_name = "Multiple Setlists"
+        if len(band_names) == 1:
+             playlist_name = f"{band_names[0]} Setlist - {locations[0]}"
+        playlist = sp.user_playlist_create(user_id, playlist_name, public=False)
         playlist_id = playlist["id"]
 
         song_uris = []
@@ -162,3 +168,9 @@ def create_spotify_playlist(songs_lists, band_names, sp):
     except Exception as e:
         logging.error(f"An error occurred while interacting with the Spotify API: {e}")
         return {"error": f"An error occurred while interacting with the Spotify API: {e}"}
+def rename_playlist(sp, playlist_id, playlist_name):
+  try:
+    sp.playlist_change_details(playlist_id, name=playlist_name)
+  except Exception as e:
+    logging.error(f"An error occurred while renaming the Spotify playlist: {e}")
+    return {"error": f"An error occurred while renaming the Spotify playlist: {e}"}
