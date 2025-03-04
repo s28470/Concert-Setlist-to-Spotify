@@ -31,6 +31,7 @@
         <form action="/delete_playlist" method="post">
           <button type="submit" class="delete-button">Delete Playlist</button>
         </form>
+
         {% if band_names_with_locations %}
           <form method="POST" class="rename-form">
             <button type="submit" name="rename" class="rename-button">Rename Playlist</button>
@@ -63,6 +64,41 @@
     {% endif %}
   </div>
 
-  <script src="{{ url_for('static', filename='js/script.js') }}"/>
+  <script>
+    function addUrlField() {
+      const container = document.getElementById('urlFieldsContainer');
+    
+
+      const fieldContainer = document.createElement('div');
+      fieldContainer.classList.add('field-container');
+    
+
+      const newUrlField = document.createElement('input');
+      newUrlField.type = 'url';
+      newUrlField.name = 'url';
+      newUrlField.required = true;
+      newUrlField.placeholder = 'Setlist.fm URL';
+      newUrlField.classList.add('url-field');
+    
+      const deleteButton = document.createElement('button');
+      deleteButton.type = 'button';
+      deleteButton.classList.add('delete-url-button');
+      deleteButton.textContent = 'X';
+      deleteButton.addEventListener('click', function() {
+        container.removeChild(fieldContainer);
+      });
+    
+      fieldContainer.appendChild(newUrlField);
+      fieldContainer.appendChild(deleteButton);
+    
+      container.appendChild(fieldContainer);
+    }
+
+    function removeField(button) {
+      const fieldContainer = button.parentNode;
+      const container = fieldContainer.parentNode;
+      container.removeChild(fieldContainer);
+    }
+  </script>
 </body>
 </html>
