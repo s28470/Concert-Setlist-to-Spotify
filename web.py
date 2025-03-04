@@ -9,6 +9,20 @@ from typing import List, Dict
 
 load_dotenv()
 
+import logging
+import sys
+
+logger = logging.getLogger()
+logger.setLevel(logging.DEBUG)
+
+# Создаем обработчик, выводящий в стандартный вывод
+stream_handler = logging.StreamHandler(sys.stdout)
+stream_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+
+logger.addHandler(stream_handler)
+
+logger.debug("Debug message")
+
 # Add the directory containing main.py to the Python path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
