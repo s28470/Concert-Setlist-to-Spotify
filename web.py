@@ -9,54 +9,64 @@ from typing import List, Dict
 
 load_dotenv()
 
-import logging
-import sys
-
+# Configure logging to output to stdout
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
-
-# Создаем обработчик, выводящий в стандартный вывод
 stream_handler = logging.StreamHandler(sys.stdout)
 stream_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
-
 logger.addHandler(stream_handler)
-
 logger.debug("Debug message")
 
 # Add the directory containing main.py to the Python path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-
 from main import get_band_name_and_songs, create_spotify_playlist, rename_playlist
 
 app = Flask(__name__)
-# Secret key for sessions; set it via the FLASK_SECRET_KEY environment variable
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "supersecretkey")
-
-logging.basicConfig(filename='app.log', level=logging.INFO,
-                    format='%(asctime)s - %(levelname)s - %(message)s')
 
 # Spotify configuration
 SPOTIPY_CLIENT_ID = os.getenv("SPOTIPY_CLIENT_ID")
 SPOTIPY_CLIENT_SECRET = os.getenv("SPOTIPY_CLIENT_SECRET")
 SPOTIPY_REDIRECT_URI = os.getenv("SPOTIPY_REDIRECT_URI")
+SCOPE = "playlist-modify-private"
 
-def get_spotify_client():
-    """Returns an authenticated Spotify client."""
-    return spotipy.Spotify(auth_manager=SpotifyOAuth(
+def get_spotify_oauth():
+    # Returns a SpotifyOAuth instance
+    return SpotifyOAuth(
         client_id=SPOTIPY_CLIENT_ID,
         client_secret=SPOTIPY_CLIENT_SECRET,
         redirect_uri=SPOTIPY_REDIRECT_URI,
-        scope="playlist-modify-private"
-    ))
+        scope=SCOPE
+    )
+
+def get_spotify_client():
+    # Returns an authenticated Spotify client or a redirect if no token is available
+    sp_oauth = get_spotify_oauth()
+    token_info = session.get("token_info", None)
+    if not token_info:
+        auth_url = sp_oauth.get_authorize_url()
+        return redirect(auth_url)
+    # Refresh token if expired
+    if sp_oauth.is_token_expired(token_info):
+        token_info = sp_oauth.refresh_access_token(token_info["refresh_token"])
+        session["token_info"] = token_info
+    access_token = token_info["access_token"]
+    return spotipy.Spotify(auth=access_token)
+
+@app.route("/callback")
+def callback():
+    # Callback route to handle Spotify's redirect and token exchange
+    sp_oauth = get_spotify_oauth()
+    code = request.args.get("code")
+    if not code:
+        flash("Authorization failed", "error")
+        return redirect(url_for("index"))
+    token_info = sp_oauth.get_access_token(code)
+    session["token_info"] = token_info
+    return redirect(url_for("index"))
 
 @app.route("/", methods=["GET", "POST"])
 def index():
-    """
-    Handles requests to the main page.
-    On a POST request:
-      - Renames the playlist if the rename option is chosen.
-      - Processes setlist.fm URLs, extracts data, creates a playlist, and saves the data in the session.
-    """
     results: List[Dict] = []
     error = None
     playlist_id = session.get("playlist_id")
@@ -74,27 +84,26 @@ def index():
                         band_name, location = band_name_with_location, ""
                     try:
                         sp = get_spotify_client()
-                        rename_playlist(sp, playlist_id, f"{band_name} Setlist - {location}")
-                        flash("Playlist renamed successfully", "success")
+                        if isinstance(sp, spotipy.Spotify):
+                            rename_playlist(sp, playlist_id, f"{band_name} Setlist - {location}")
+                            flash("Playlist renamed successfully", "success")
+                        else:
+                            return sp  # redirect to authorization if needed
                     except Exception as e:
                         error = str(e)
                         logging.error(f"Error renaming playlist: {error}")
             return redirect(url_for('index'))
 
-        urls = request.form.getlist("url")  # Get the list of URLs
-        try:
-            sp = get_spotify_client()
-        except Exception as e:
-            error = str(e)
-            logging.error(f"Spotify client error: {error}")
-            return render_template("index.html", results=results, error=error,
-                                   playlist_id=playlist_id, playlist_url=playlist_url,
-                                   band_names_with_locations=band_names_with_locations)
+        urls = request.form.getlist("url")
+        client_or_redirect = get_spotify_client()
+        # If a redirect was returned, return it
+        if not isinstance(client_or_redirect, spotipy.Spotify):
+            return client_or_redirect
+        sp = client_or_redirect
 
         songs_lists = []
         band_names = []
         locations = []
-        temp_results = []
         band_names_with_locations = []
 
         for url in urls:
@@ -123,7 +132,6 @@ def index():
                 result["error"] = str(e)
                 logging.error(f"Error processing URL {url}: {result['error']}")
             results.append(result)
-            temp_results.append(result)
 
         try:
             playlist_data = create_spotify_playlist(songs_lists, band_names, locations, sp)
@@ -132,7 +140,7 @@ def index():
             else:
                 session["playlist_id"] = playlist_data["id"]
                 playlist_id = session["playlist_id"]
-                # Get playlist details to retrieve the proper URL
+                # Get full playlist info
                 playlist_full_info = sp.playlist(playlist_id)
                 session["playlist_url"] = playlist_full_info["external_urls"]["spotify"].replace(
                     "https://open.spotify.com/playlist/",
@@ -158,13 +166,14 @@ def index():
 
 @app.route('/delete_playlist', methods=['POST'])
 def delete_playlist():
-    """
-    Deletes the user's playlist (unfollows it) and clears session data.
-    """
+    # Delete (unfollow) the playlist and clear session data
     playlist_id = session.get("playlist_id")
     if playlist_id:
         try:
-            sp = get_spotify_client()
+            client_or_redirect = get_spotify_client()
+            if not isinstance(client_or_redirect, spotipy.Spotify):
+                return client_or_redirect
+            sp = client_or_redirect
             sp.current_user_unfollow_playlist(playlist_id)
             flash("Playlist deleted successfully", "success")
         except Exception as e:
@@ -176,10 +185,7 @@ def delete_playlist():
             session.pop("band_names_with_locations", None)
     return redirect(url_for('index'))
 
-
-
 if __name__ == "__main__":
     host = "0.0.0.0"
     port = int(os.environ.get('PORT', 5001))
-    # Debug mode is disabled for production
     app.run(host=host, port=port, debug=False)
